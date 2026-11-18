@@ -1,5 +1,5 @@
 
-name: Flask CI Pipeline #workflow name
+name: Flask CI/CD Pipeline
 
 on:
   push:
@@ -17,7 +17,9 @@ permissions:
   pull-requests: read
 
 jobs:
-  test:
+
+  ci:
+    name: Continuous Integration
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +43,6 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
 
       - name: Build Docker image
         run: docker build -t newcicd:${{ github.sha }} .
@@ -67,6 +68,22 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           docker tag newcicd:${{ github.sha }} $DOCKERHUB_USERNAME/newcicd:${{ github.sha }}
-
           docker push $DOCKERHUB_USERNAME/newcicd:${{ github.sha }}
 
+  cd:
+    name: Continuous Deployment
+    needs: ci
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Prepare deployment image
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          echo "Image ready for deployment:"
+          echo "$DOCKERHUB_USERNAME/newcicd:${{ github.sha }}"
+          echo "Kubernetes deployment manifest: k8s/deployment.yaml"
